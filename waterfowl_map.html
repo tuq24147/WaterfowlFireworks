@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fireworks Free Buffer Zones – Philadelphia</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; display: flex; height: 100vh; overflow: hidden; }
+
+    #sidebar {
+      width: 280px; min-width: 280px; background: #fff;
+      display: flex; flex-direction: column;
+      box-shadow: 2px 0 8px rgba(0,0,0,0.15); z-index: 1000; overflow: hidden;
+    }
+    #sidebar-header { background: #1a6faf; color: white; padding: 14px 16px; }
+    #sidebar-header h2 { font-size: 13px; line-height: 1.4; }
+    #sidebar-header p  { font-size: 11px; opacity: 0.85; margin-top: 4px; }
+
+    #search-box { padding: 10px 12px; border-bottom: 1px solid #e0e0e0; }
+    #search-box input {
+      width: 100%; padding: 6px 10px;
+      border: 1px solid #ccc; border-radius: 4px; font-size: 13px;
+    }
+
+    #buffer-control { padding: 10px 12px; border-bottom: 1px solid #e0e0e0; font-size: 13px; }
+    #buffer-control label { display: flex; justify-content: space-between; margin-bottom: 4px; }
+    #buffer-control input[type=range] { width: 100%; cursor: pointer; }
+
+    #feature-list { overflow-y: auto; flex: 1; }
+    .list-section-title {
+      padding: 8px 12px; font-size: 11px; font-weight: bold;
+      text-transform: uppercase; letter-spacing: 0.5px;
+      color: #888; background: #f5f5f5; border-bottom: 1px solid #e0e0e0;
+    }
+    .list-item {
+      padding: 9px 12px; font-size: 13px; cursor: pointer;
+      border-bottom: 1px solid #f0f0f0;
+      display: flex; align-items: center; gap: 8px; transition: background 0.15s;
+    }
+    .list-item:hover { background: #eef5fb; }
+    .list-item .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .list-item .risk-badge {
+      margin-left: auto; font-size: 10px; padding: 2px 6px;
+      border-radius: 10px; font-weight: bold; white-space: nowrap;
+    }
+    .risk-high   { background: #fde8e8; color: #c0392b; }
+    .risk-medium { background: #fef3cd; color: #856404; }
+    .risk-low    { background: #e8f5e9; color: #2e7d32; }
+
+
+
+    #map { flex: 1; }
+
+    @keyframes burst {
+      0%   { box-shadow: 0 0 0 0 rgba(220,38,38,0.7); }
+      70%  { box-shadow: 0 0 0 12px rgba(220,38,38,0); }
+      100% { box-shadow: 0 0 0 0 rgba(220,38,38,0); }
+    }
+    .firework-marker {
+      width: 18px; height: 18px;
+      background: #dc2626; border: 2.5px solid #7f1d1d;
+      transform: rotate(45deg); animation: burst 1.6s infinite;
+    }
+
+    .legend {
+      background: white; padding: 10px 14px; border-radius: 6px;
+      box-shadow: 0 1px 5px rgba(0,0,0,0.4); line-height: 1.9; font-size: 12px;
+    }
+    .legend h4 { margin-bottom: 6px; font-size: 13px; }
+    .legend-item { display: flex; align-items: center; gap: 8px; }
+    .swatch {
+      width: 16px; height: 16px; border-radius: 3px;
+      flex-shrink: 0; border: 1px solid rgba(0,0,0,0.2);
+    }
+    .swatch.circle { border-radius: 50%; }
+
+    #about-toggle {
+      padding: 11px 12px;
+      font-size: 13px; font-weight: bold;
+      color: white; cursor: pointer;
+      border-bottom: 2px solid #0d3d6b;
+      background: #1a6faf;
+      display: flex; justify-content: space-between; align-items: center;
+      user-select: none;
+      letter-spacing: 0.3px;
+    }
+    #about-toggle:hover { background: #155a8a; }
+    #about-body {
+      display: none;
+      padding: 10px 12px;
+      font-size: 12px; line-height: 1.6;
+      color: #333; border-bottom: 1px solid #e0e0e0;
+      overflow-y: auto; max-height: 280px;
+    }
+    #about-body h4 { font-size: 12px; color: #1a6faf; margin: 8px 0 3px; }
+    #about-body p  { margin-bottom: 6px; }
+  </style>
+</head>
+<body>
+
+<div id="sidebar">
+  <div id="sidebar-header">
+    <h2>🦆 Fireworks Free Buffer Zones Near Waterfowl Habitats in Philadelphia</h2>
+    <p>Philadelphia — Waterfowl &amp; Fireworks Buffer Zones</p>
+  </div>
+  <div id="about-toggle" onclick="toggleAbout()">ℹ️ About &amp; Methodology <span id="about-arrow">▼</span></div>
+  <div id="about-body">
+    <p>The main purpose of the map is to visualize proposed 5-10 kilometer buffer zones around key waterfowl habitat areas. These buffer zones represent areas where firework events would be limited or restricted to reduce disturbance to birds from loud noise, bright light, and air pollution. The map shows a visual representation of the spatial relationship between fireworks and waterfowl habitat.</p>
+    <p>The data for the map would come from both outside sources and manually created points. Waterfowl habitat areas and the species which resided there could be identified using NOAA wetlands data. Firework launch sites were manually added based on common Philadelphia firework event locations where large public firework displays often occur annually. The 5-10 kilometer buffer zones were created around the habitat locations to represent the proposed policy area where fireworks would not be permitted.</p>
+    <p>I used Leaflet to build the map on Visual Studio and used Amazon Q when I got stuck. I used GeoJSON to store the habitat and firework location data. I learned how to improve map design matters by following visual hierarchy. For example, I made fireworks launch sites stand out clearly from waterfowl habitats to be easy to identify and differentiate. I also made the buffer zones transparent so they did not hide the rest of the map.</p>
+    <p>I created an interactive map instead of a static map so the user could click on the various habitats to learn their names and what species live there. In addition, they can click on the fireworks sites to see when the events occur. Lastly, the interactive map allows users to zoom in, change buffer size, and understand why certain locations may be more concerning for waterfowl. This map is useful for policymakers because it clearly shows where proposed restrictions would apply and how current fireworks events often occur within close distance of vulnerable waterfowl habitats.</p>
+  </div>
+
+  <div id="search-box">
+    <input id="search-input" type="text" placeholder="Search habitats or firework sites…" />
+  </div>
+  <div id="buffer-control">
+    <label>
+      <span>Buffer radius</span>
+      <span id="buffer-val">3 km</span>
+    </label>
+    <input id="buffer-slider" type="range" min="1" max="10" step="0.5" value="3" />
+  </div>
+  <div id="feature-list"></div>
+
+</div>
+
+<div id="map"></div>
+
+<script>
+// 1. DATA
+const HABITAT_COLORS = ["#1a6faf","#2196a8","#1a7a5e","#6a3d9a","#b07d2a"];
+
+const habitatGeoJSON = {
+  type: "FeatureCollection",
+  features: [
+    { type:"Feature", geometry:{ type:"Point", coordinates:[-75.1879,39.9526] },
+      properties:{ name:"Schuylkill River Wetlands", species:"Canada Goose, Mallard Duck, Great Blue Heron" }},
+    { type:"Feature", geometry:{ type:"Point", coordinates:[-75.2100,40.0050] },
+      properties:{ name:"Wissahickon Creek Corridor", species:"Wood Duck, Hooded Merganser, Bufflehead" }},
+    { type:"Feature", geometry:{ type:"Point", coordinates:[-75.0500,39.9900] },
+      properties:{ name:"Pennypack Creek Marsh", species:"Mallard Duck, American Black Duck, Gadwall" }},
+    { type:"Feature", geometry:{ type:"Point", coordinates:[-75.2400,39.9200] },
+      properties:{ name:"Cobbs Creek Riparian Zone", species:"Canada Goose, Northern Pintail, Green-winged Teal" }},
+    { type:"Feature", geometry:{ type:"Point", coordinates:[-75.1500,39.8800] },
+      properties:{ name:"John Heinz National Wildlife Refuge", species:"Snow Goose, Tundra Swan, Ring-necked Duck, Lesser Scaup" }}
+  ]
+};
+
+const fireworkGeoJSON = {
+  type: "FeatureCollection",
+  features: [
+    { type:"Feature", geometry:{ type:"Point", coordinates:[-75.1398,39.9470] },
+      properties:{ name:"Penn's Landing", event:"July 4th Fireworks (Welcome America Festival)" }},
+    { type:"Feature", geometry:{ type:"Point", coordinates:[-75.1727,39.9566] },
+      properties:{ name:"Benjamin Franklin Parkway", event:"July 4th Fireworks (Philadelphia Orchestra Celebration)" }},
+    { type:"Feature", geometry:{ type:"Point", coordinates:[-75.1665,39.9057] },
+      properties:{ name:"Citizens Bank Park", event:"Post-game Fireworks Nights (Phillies Season)" }},
+    { type:"Feature", geometry:{ type:"Point", coordinates:[-75.1275,39.9723] },
+      properties:{ name:"Penn Treaty Park", event:"July 4th Fireworks (Fishtown Celebration)" }},
+    { type:"Feature", geometry:{ type:"Point", coordinates:[-75.1733,39.9018] },
+      properties:{ name:"Lincoln Financial Field", event:"Eagles Game Fireworks Celebrations" }},
+    { type:"Feature", geometry:{ type:"Point", coordinates:[-75.1382,39.9520] },
+      properties:{ name:"Penns Landing Festival Pier", event:"Summer Concert Series Fireworks" }},
+    { type:"Feature", geometry:{ type:"Point", coordinates:[-75.1590,39.9401] },
+      properties:{ name:"Xfinity Live!", event:"New Year's Eve Fireworks" }}
+  ]
+};
+
+// 2. MAP
+const map = L.map("map");
+
+L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',
+  maxZoom: 19
+}).addTo(map);
+
+L.control.scale({ imperial: true, metric: true }).addTo(map);
+
+const savedLayers = JSON.parse(localStorage.getItem("visibleLayers") || "{}");
+
+// 3. HELPERS
+function haversineKm([lon1, lat1], [lon2, lat2]) {
+  const R = 6371, toRad = x => x * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function nearestHabitat(fwCoords) {
+  let minDist = Infinity, nearest = "";
+  habitatGeoJSON.features.forEach(h => {
+    const d = haversineKm(fwCoords, h.geometry.coordinates);
+    if (d < minDist) { minDist = d; nearest = h.properties.name; }
+  });
+  return { nearest, distKm: minDist.toFixed(2) };
+}
+
+function fireworksInRange(habitatCoords, radiusKm) {
+  return fireworkGeoJSON.features.filter(f =>
+    haversineKm(habitatCoords, f.geometry.coordinates) <= radiusKm
+  ).length;
+}
+
+function riskLabel(count) {
+  if (count >= 2) return { text: "⚠️ " + count + " sites nearby", cls: "risk-high" };
+  if (count === 1) return { text: "⚠️ 1 site nearby", cls: "risk-medium" };
+  return { text: "✅ Low risk", cls: "risk-low" };
+}
+
+let bufferRadiusKm = 3;
+
+// 4. HABITAT LAYER
+const habitatMarkers = [];
+
+const habitatLayer = L.geoJSON(habitatGeoJSON, {
+  pointToLayer: function(feature, latlng) {
+    const idx = habitatGeoJSON.features.indexOf(feature);
+    const color = HABITAT_COLORS[idx % HABITAT_COLORS.length];
+    return L.circleMarker(latlng, {
+      radius: 9, fillColor: color, color: "#fff",
+      weight: 2, opacity: 1, fillOpacity: 0.9
+    });
+  },
+  onEachFeature: function(feature, layer) {
+    habitatMarkers.push({ feature: feature, layer: layer });
+    updateHabitatPopup(feature, layer);
+    layer.on("popupopen", function() { map.setView(layer.getLatLng(), 14); });
+  }
+}).addTo(map);
+
+function updateHabitatPopup(feature, layer) {
+  const p = feature.properties;
+  const count = fireworksInRange(feature.geometry.coordinates, bufferRadiusKm);
+  const risk = riskLabel(count);
+
+  // Find nearest firework site and its distance
+  let minDist = Infinity, nearestFW = "";
+  fireworkGeoJSON.features.forEach(function(f) {
+    const d = haversineKm(feature.geometry.coordinates, f.geometry.coordinates);
+    if (d < minDist) { minDist = d; nearestFW = f.properties.name; }
+  });
+
+  layer.bindPopup(
+    "<b>🦆 " + p.name + "</b><br/>" +
+    "<i>Species:</i> " + p.species + "<br/>" +
+    "<hr style='margin:5px 0'/>" +
+    "<i>Nearest firework site:</i> " + nearestFW + "<br/>" +
+    "<i>Distance:</i> " + minDist.toFixed(2) + " km<br/>" +
+    "<span style='font-size:12px'>" + risk.text + "</span>"
+  );
+}
+
+// 5. BUFFER ZONES
+const bufferLayer = L.layerGroup();
+const bufferCircles = [];
+
+habitatGeoJSON.features.forEach(function(feature, idx) {
+  const coords = feature.geometry.coordinates;
+  const color = HABITAT_COLORS[idx % HABITAT_COLORS.length];
+  const circle = L.circle([coords[1], coords[0]], {
+    radius: bufferRadiusKm * 1000,
+    color: color, weight: 1.5,
+    fillColor: color, fillOpacity: 0.12,
+    dashArray: "6 4", interactive: false
+  });
+  bufferCircles.push(circle);
+  circle.addTo(bufferLayer);
+});
+
+bufferLayer.addTo(map);
+
+// 6. DISTANCE LINES
+const lineLayer = L.layerGroup();
+
+fireworkGeoJSON.features.forEach(function(fw) {
+  const fwCoords = fw.geometry.coordinates;
+  let minDist = Infinity, nearestCoords = null;
+  habitatGeoJSON.features.forEach(function(h) {
+    const d = haversineKm(fwCoords, h.geometry.coordinates);
+    if (d < minDist) { minDist = d; nearestCoords = h.geometry.coordinates; }
+  });
+  if (!nearestCoords) return;
+
+  L.polyline(
+    [[fwCoords[1], fwCoords[0]], [nearestCoords[1], nearestCoords[0]]],
+    { color: "#e03030", weight: 1.5, dashArray: "5 6", opacity: 0.7, interactive: false }
+  ).addTo(lineLayer);
+
+  const midLat = (fwCoords[1] + nearestCoords[1]) / 2;
+  const midLon = (fwCoords[0] + nearestCoords[0]) / 2;
+  L.marker([midLat, midLon], {
+    icon: L.divIcon({
+      className: "",
+      html: "<div style='background:white;border:1px solid #e03030;border-radius:3px;padding:1px 5px;font-size:10px;color:#c0392b;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,0.2)'>" + minDist.toFixed(1) + " km</div>",
+      iconAnchor: [20, 10]
+    }),
+    interactive: false
+  }).addTo(lineLayer);
+});
+
+lineLayer.addTo(map);
+
+// 7. FIREWORK LAYER
+const fireworkIcon = L.divIcon({
+  className: "",
+  html: "<div class='firework-marker'></div>",
+  iconSize: [18, 18], iconAnchor: [9, 9]
+});
+
+const fireworkMarkers = [];
+
+const fireworkLayer = L.geoJSON(fireworkGeoJSON, {
+  pointToLayer: function(feature, latlng) {
+    return L.marker(latlng, { icon: fireworkIcon });
+  },
+  onEachFeature: function(feature, layer) {
+    fireworkMarkers.push({ feature: feature, layer: layer });
+    const p = feature.properties;
+    const result = nearestHabitat(feature.geometry.coordinates);
+    layer.bindPopup(
+      "<b>🎆 " + p.name + "</b><br/>" +
+      "<i>Event:</i> " + p.event + "<br/>" +
+      "<hr style='margin:5px 0'/>" +
+      "<i>Nearest habitat:</i> " + result.nearest + "<br/>" +
+      "<i>Distance:</i> " + result.distKm + " km"
+    );
+    layer.on("popupopen", function() { map.setView(layer.getLatLng(), 14); });
+  }
+}).addTo(map);
+
+// 8. LAYER TOGGLE + localStorage
+const overlays = {
+  "🦆 Waterfowl Habitats": habitatLayer,
+  "🔵 Buffer Zones": bufferLayer,
+  "🎆 Firework Launch Sites": fireworkLayer,
+  "📏 Distance Lines": lineLayer
+};
+
+Object.keys(overlays).forEach(function(name) {
+  if (savedLayers[name] === false) map.removeLayer(overlays[name]);
+});
+
+L.control.layers(null, overlays, { collapsed: false, position: "topright" }).addTo(map);
+
+map.on("overlayadd overlayremove", function() {
+  const state = {};
+  Object.keys(overlays).forEach(function(name) {
+    state[name] = map.hasLayer(overlays[name]);
+  });
+  localStorage.setItem("visibleLayers", JSON.stringify(state));
+});
+
+// 9. FIT BOUNDS
+map.fitBounds(L.featureGroup([habitatLayer, fireworkLayer]).getBounds(), { padding: [40, 40] });
+
+// 10. LEGEND
+const legend = L.control({ position: "bottomleft" });
+legend.onAdd = function() {
+  const div = L.DomUtil.create("div", "legend");
+  let html = "<h4>Map Legend</h4>";
+  HABITAT_COLORS.forEach(function(c, i) {
+    const shortName = habitatGeoJSON.features[i].properties.name.split(" ").slice(0, 2).join(" ") + "…";
+    html += "<div class='legend-item'><div class='swatch circle' style='background:" + c + ";border-color:" + c + "'></div>" + shortName + "</div>";
+  });
+  html += "<div class='legend-item'><div style='width:14px;height:14px;background:#dc2626;border:2px solid #7f1d1d;transform:rotate(45deg);flex-shrink:0'></div>Firework Site</div>";
+  html += "<div class='legend-item'><div class='swatch' style='background:#4da6e8;opacity:0.5;border-color:#1a6faf'></div>Buffer Zone</div>";
+  html += "<div class='legend-item'><div class='swatch' style='background:white;border:1px dashed #e03030'></div>Distance Line</div>";
+  div.innerHTML = html;
+  return div;
+};
+legend.addTo(map);
+
+// 11. INFO PANEL
+
+
+// 12. SIDEBAR LIST
+function buildSidebarList(filter) {
+  filter = filter || "";
+  const container = document.getElementById("feature-list");
+  container.innerHTML = "";
+  const q = filter.toLowerCase();
+
+  const filteredHabitats = habitatGeoJSON.features.filter(function(f) {
+    return f.properties.name.toLowerCase().indexOf(q) > -1 || f.properties.species.toLowerCase().indexOf(q) > -1;
+  });
+
+  if (filteredHabitats.length) {
+    const title = document.createElement("div");
+    title.className = "list-section-title";
+    title.textContent = "Waterfowl Habitats";
+    container.appendChild(title);
+
+    filteredHabitats.forEach(function(feature) {
+      const idx = habitatGeoJSON.features.indexOf(feature);
+      const color = HABITAT_COLORS[idx % HABITAT_COLORS.length];
+      const count = fireworksInRange(feature.geometry.coordinates, bufferRadiusKm);
+      const risk = riskLabel(count);
+      const item = document.createElement("div");
+      item.className = "list-item";
+      item.innerHTML =
+        "<div class='dot' style='background:" + color + "'></div>" +
+        "<span>" + feature.properties.name + "</span>" +
+        "<span class='risk-badge " + risk.cls + "'>" + risk.text + "</span>";
+      item.addEventListener("click", function() {
+        const coords = feature.geometry.coordinates;
+        map.setView([coords[1], coords[0]], 14);
+        const match = habitatMarkers.find(function(m) { return m.feature === feature; });
+        if (match) match.layer.openPopup();
+      });
+      container.appendChild(item);
+    });
+  }
+
+  const filteredFW = fireworkGeoJSON.features.filter(function(f) {
+    return f.properties.name.toLowerCase().indexOf(q) > -1 || f.properties.event.toLowerCase().indexOf(q) > -1;
+  });
+
+  if (filteredFW.length) {
+    const title = document.createElement("div");
+    title.className = "list-section-title";
+    title.textContent = "Firework Launch Sites";
+    container.appendChild(title);
+
+    filteredFW.forEach(function(feature) {
+      const item = document.createElement("div");
+      item.className = "list-item";
+      item.innerHTML =
+        "<div style='width:10px;height:10px;background:#dc2626;border:1.5px solid #7f1d1d;transform:rotate(45deg);flex-shrink:0'></div>" +
+        "<span>" + feature.properties.name + "</span>";
+      item.addEventListener("click", function() {
+        const coords = feature.geometry.coordinates;
+        map.setView([coords[1], coords[0]], 14);
+        const match = fireworkMarkers.find(function(m) { return m.feature === feature; });
+        if (match) match.layer.openPopup();
+      });
+      container.appendChild(item);
+    });
+  }
+
+  if (!filteredHabitats.length && !filteredFW.length) {
+    container.innerHTML = "<div style='padding:12px;color:#888;font-size:13px'>No results found.</div>";
+  }
+}
+
+function toggleAbout() {
+  const body = document.getElementById("about-body");
+  const arrow = document.getElementById("about-arrow");
+  const open = body.style.display === "block";
+  body.style.display = open ? "none" : "block";
+  arrow.textContent = open ? "▼" : "▲";
+}
+
+buildSidebarList();
+
+document.getElementById("search-input").addEventListener("input", function(e) {
+  buildSidebarList(e.target.value);
+});
+
+// 13. BUFFER SLIDER
+document.getElementById("buffer-slider").addEventListener("input", function() {
+  bufferRadiusKm = parseFloat(this.value);
+  document.getElementById("buffer-val").textContent = bufferRadiusKm + " km";
+  bufferCircles.forEach(function(c) { c.setRadius(bufferRadiusKm * 1000); });
+  habitatMarkers.forEach(function(m) { updateHabitatPopup(m.feature, m.layer); });
+  buildSidebarList(document.getElementById("search-input").value);
+});
+
+// 14. DOWNLOAD
+
+</script>
+</body>
+</html>
